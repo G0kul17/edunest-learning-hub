@@ -162,6 +162,7 @@ cd edunest-learning-hub
 ```bash
 cd backend
 npm install
+npm install dotenv express cors bcryptjs better-sqlite3 jsonwebtoken
 ```
 
 Create a `.env` file inside `backend/`:
