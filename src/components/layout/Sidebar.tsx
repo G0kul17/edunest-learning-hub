@@ -119,9 +119,12 @@ export default function AppSidebar() {
             )}
           </AnimatePresence>
           {!collapsed && (
-            <button onClick={logout} className="text-muted-foreground hover:text-destructive transition-colors">
-              <LogOut className="w-4 h-4" />
-            </button>
+            <button
+            onClick={() => { logout(); navigate("/login"); }}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
           )}
         </div>
       </div>

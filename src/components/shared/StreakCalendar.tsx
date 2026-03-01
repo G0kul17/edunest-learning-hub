@@ -1,109 +1,190 @@
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useRef, useState, useLayoutEffect, useMemo } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface StreakCalendarProps {
   data: { date: string; count: number }[];
-  weeks?: number;
+  months?: number;
 }
 
-const getColorLevel = (count: number): string => {
-  if (count === 0) return "bg-secondary";
-  if (count <= 2) return "bg-primary/20";
-  if (count <= 4) return "bg-primary/40";
-  if (count <= 7) return "bg-primary/60";
-  return "bg-primary";
-};
+const LEVEL_COLORS = [
+  "bg-secondary/60",
+  "bg-primary/20",
+  "bg-primary/40",
+  "bg-primary/65",
+  "bg-primary",
+];
 
-const dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
+function getLevel(count: number) {
+  if (count === 0) return 0;
+  if (count <= 2) return 1;
+  if (count <= 5) return 2;
+  if (count <= 9) return 3;
+  return 4;
+}
 
-export default function StreakCalendar({ data, weeks = 52 }: StreakCalendarProps) {
-  // Build grid: 7 rows × N columns
-  const totalDays = weeks * 7;
-  const relevantData = data.slice(-totalDays);
+const DAY_LABEL_W = 28;
+const GAP = 2;
+const DAY_LABELS = ["Sun", "", "Tue", "", "Thu", "", "Sat"];
 
-  // Pad if needed
-  while (relevantData.length < totalDays) {
-    relevantData.unshift({ date: "", count: 0 });
-  }
+export default function StreakCalendar({ data, months = 12 }: StreakCalendarProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(13);
 
-  // Chunk into weeks
-  const weekColumns: typeof relevantData[] = [];
-  for (let i = 0; i < relevantData.length; i += 7) {
-    weekColumns.push(relevantData.slice(i, i + 7));
-  }
+  const dataMap = useMemo(() => {
+    const m = new Map<string, number>();
+    data.forEach(({ date, count }) => { if (date) m.set(date, count); });
+    return m;
+  }, [data]);
 
-  // Month labels
-  const monthLabels: { label: string; index: number }[] = [];
-  let lastMonth = "";
-  weekColumns.forEach((week, i) => {
-    const firstDay = week.find((d) => d.date);
-    if (firstDay?.date) {
-      const month = new Date(firstDay.date).toLocaleString("default", { month: "short" });
-      if (month !== lastMonth) {
-        monthLabels.push({ label: month, index: i });
-        lastMonth = month;
+  const { weeks, monthLabelMap } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const rangeStart = new Date(today);
+    rangeStart.setMonth(rangeStart.getMonth() - months + 1);
+    rangeStart.setDate(1);
+    // Align to Sunday
+    rangeStart.setDate(rangeStart.getDate() - rangeStart.getDay());
+
+    const weeks: { iso: string; count: number; active: boolean }[][] = [];
+    const cursor = new Date(rangeStart);
+
+    while (cursor <= today) {
+      const week: { iso: string; count: number; active: boolean }[] = [];
+      for (let d = 0; d < 7; d++) {
+        const iso = cursor.toISOString().split("T")[0];
+        week.push({ iso, count: dataMap.get(iso) ?? 0, active: cursor <= today });
+        cursor.setDate(cursor.getDate() + 1);
       }
+      weeks.push(week);
     }
-  });
+
+    // Build a map: week-index → month label
+    // Show a label only when the month changes AND there's enough space from the last label
+    const monthLabelMap = new Map<number, string>();
+    let lastMonth = -1;
+    let lastLabelCol = -99;
+
+    weeks.forEach((week, col) => {
+      const activeDay = week.find((d) => d.active);
+      if (!activeDay) return;
+      const [y, mo] = activeDay.iso.split("-").map(Number);
+      const date = new Date(y, mo - 1, 1);
+      const m = date.getMonth();
+      // require at least 3 week columns of gap to prevent overlap
+      if (m !== lastMonth && col - lastLabelCol >= 3) {
+        monthLabelMap.set(col, date.toLocaleString("default", { month: "short" }));
+        lastMonth = m;
+        lastLabelCol = col;
+      }
+    });
+
+    return { weeks, monthLabelMap };
+  }, [dataMap, months]);
+
+  // Responsive cell size via ResizeObserver
+  useLayoutEffect(() => {
+    const update = () => {
+      if (!containerRef.current) return;
+      const available = containerRef.current.clientWidth - DAY_LABEL_W - 4;
+      const cs = Math.floor((available - (weeks.length - 1) * GAP) / weeks.length);
+      setCellSize(Math.max(8, Math.min(18, cs)));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [weeks.length]);
 
   return (
-    <div className="overflow-x-auto scrollbar-thin">
-      {/* Month labels */}
-      <div className="flex ml-8 mb-1">
-        {monthLabels.map((m, i) => (
-          <span
-            key={i}
-            className="text-xs text-muted-foreground"
-            style={{ position: "relative", left: `${m.index * 14}px` }}
-          >
-            {m.label}
-          </span>
-        ))}
+    <div ref={containerRef} className="w-full select-none">
+
+      {/* ── Top row: day-label spacer + month labels (same flex as grid) ── */}
+      <div className="flex mb-1">
+        {/* Spacer to match day-label column */}
+        <div style={{ width: DAY_LABEL_W + 4, flexShrink: 0 }} />
+
+        {/* One cell per week — label overflows right with overflow:visible */}
+        <div className="flex flex-1" style={{ gap: GAP }}>
+          {weeks.map((_, wi) => (
+            <div
+              key={wi}
+              className="flex-1 relative overflow-visible"
+              style={{ height: 14 }}
+            >
+              {monthLabelMap.has(wi) && (
+                <span className="absolute left-0 top-0 text-[10px] text-muted-foreground whitespace-nowrap">
+                  {monthLabelMap.get(wi)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="flex gap-0.5">
-        {/* Day labels */}
-        <div className="flex flex-col gap-0.5 mr-1">
-          {dayLabels.map((label, i) => (
-            <span key={i} className="text-[10px] text-muted-foreground h-[12px] flex items-center w-6">
+      {/* ── Grid: day labels + week columns ── */}
+      <div className="flex">
+        {/* Day-of-week labels column */}
+        <div
+          className="flex flex-col shrink-0"
+          style={{ width: DAY_LABEL_W, gap: GAP, marginRight: 4 }}
+        >
+          {DAY_LABELS.map((label, i) => (
+            <div
+              key={i}
+              style={{ height: cellSize }}
+              className="text-[9px] text-muted-foreground flex items-center justify-end pr-1"
+            >
               {label}
-            </span>
+            </div>
           ))}
         </div>
 
-        {/* Grid */}
-        {weekColumns.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-0.5">
-            {week.map((day, di) => (
-              <Tooltip key={`${wi}-${di}`}>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: wi * 0.005, duration: 0.15 }}
-                    className={`w-[12px] h-[12px] rounded-[2px] ${getColorLevel(day.count)} transition-colors cursor-pointer hover:ring-1 hover:ring-primary/50`}
-                  />
-                </TooltipTrigger>
-                {day.date && (
-                  <TooltipContent className="glass-strong border-border text-xs">
-                    <p className="font-medium text-foreground">{day.date}</p>
-                    <p className="text-muted-foreground">{day.count} activities</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            ))}
-          </div>
-        ))}
+        {/* Week columns */}
+        <div className="flex flex-1" style={{ gap: GAP }}>
+          {weeks.map((week, wi) => (
+            <div key={wi} className="flex flex-col flex-1" style={{ gap: GAP }}>
+              {week.map((day, di) => (
+                <Tooltip key={di}>
+                  <TooltipTrigger asChild>
+                    <div
+                      style={{ height: cellSize }}
+                      className={`w-full rounded-[2px] cursor-pointer transition-colors hover:ring-1 hover:ring-primary/60 ${
+                        day.active ? LEVEL_COLORS[getLevel(day.count)] : "bg-transparent"
+                      }`}
+                    />
+                  </TooltipTrigger>
+                  {day.active && (
+                    <TooltipContent className="border-border text-xs">
+                      <p className="font-medium text-foreground">{day.iso}</p>
+                      <p className="text-muted-foreground">
+                        {day.count === 0
+                          ? "No activity"
+                          : `${day.count} activit${day.count === 1 ? "y" : "ies"}`}
+                      </p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-1 mt-2 ml-8">
-        <span className="text-xs text-muted-foreground mr-1">Less</span>
-        {[0, 2, 4, 7, 10].map((level) => (
-          <div key={level} className={`w-[12px] h-[12px] rounded-[2px] ${getColorLevel(level)}`} />
+      {/* ── Legend ── */}
+      <div
+        className="flex items-center gap-1.5 mt-2"
+        style={{ marginLeft: DAY_LABEL_W + 4 }}
+      >
+        <span className="text-[10px] text-muted-foreground mr-1">Less</span>
+        {LEVEL_COLORS.map((cls, i) => (
+          <div
+            key={i}
+            style={{ width: cellSize, height: cellSize }}
+            className={`rounded-[2px] shrink-0 ${cls}`}
+          />
         ))}
-        <span className="text-xs text-muted-foreground ml-1">More</span>
+        <span className="text-[10px] text-muted-foreground ml-1">More</span>
       </div>
     </div>
   );

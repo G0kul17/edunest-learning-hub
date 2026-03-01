@@ -12,6 +12,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -22,10 +24,20 @@ export default function Login() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, password, role);
-    navigate(role === "admin" ? "/admin/dashboard" : "/student/dashboard");
+    setError("");
+    setLoading(true);
+    const result = await login(email, password, role);
+    setLoading(false);
+    if (result.success) {
+      // Navigate based on the role from the returned user (from backend)
+      const stored = localStorage.getItem("edunest-user");
+      const user = stored ? JSON.parse(stored) : null;
+      navigate(user?.role === "admin" ? "/admin/dashboard" : "/student/dashboard");
+    } else {
+      setError(result.error || "Login failed. Please check your credentials.");
+    }
   };
 
   return (
@@ -204,11 +216,18 @@ export default function Login() {
               <a href="#" className="text-sm text-primary hover:underline">Forgot password?</a>
             </div>
 
+            {error && (
+              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5">
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm relative overflow-hidden group"
+              disabled={loading}
+              className="w-full py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground font-medium text-sm relative overflow-hidden group disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <span className="relative z-10">Sign In</span>
+              <span className="relative z-10">{loading ? "Signing in..." : "Sign In"}</span>
               <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
           </form>

@@ -18,7 +18,7 @@ const statCards = [
 ];
 
 export default function AdminDashboard() {
-  const activityData = mockStudents[0].activityData.slice(-90);
+  const activityData = mockStudents[0].activityData;
   const [fabOpen, setFabOpen] = React.useState(false);
 
   return (
@@ -60,7 +60,7 @@ export default function AdminDashboard() {
         <ScrollReveal>
           <GlowCard glowColor="blue">
             <h3 className="font-heading font-semibold text-foreground mb-4">Student Activity — Last 90 Days</h3>
-            <StreakCalendar data={activityData} weeks={13} />
+            <StreakCalendar data={activityData} months={12} />
           </GlowCard>
         </ScrollReveal>
 

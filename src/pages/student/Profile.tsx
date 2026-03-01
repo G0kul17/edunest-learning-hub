@@ -1,15 +1,35 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import GlowCard from "@/components/ui/GlowCard";
 import ScrollReveal from "@/components/ui/ScrollReveal";
 import StreakCalendar from "@/components/shared/StreakCalendar";
 import ProgressRing from "@/components/ui/ProgressRing";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
+import SettingsModal from "@/components/layout/SettingsModal";
 import { mockStudents, mockCourses } from "@/data/mockData";
-import { User, Flame, Trophy, BookOpen, Code2, Calendar } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { User, Flame, Trophy, Settings, LogOut } from "lucide-react";
 
 export default function Profile() {
-  const student = mockStudents[0];
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Find student data from mock that matches the logged-in user (fallback to first student)
+  const student = mockStudents.find((s) => s.id === user?.id) || mockStudents[0];
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const initials = (user?.name || "?")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <DashboardLayout>
@@ -18,15 +38,28 @@ export default function Profile() {
         <ScrollReveal>
           <GlowCard glowColor="blue">
             <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/30">
-                <User className="w-10 h-10 text-primary" />
+              {/* Avatar */}
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/40 to-accent/40 border-2 border-primary/30 flex items-center justify-center text-primary font-bold text-2xl select-none">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  initials
+                )}
               </div>
-              <div className="text-center sm:text-left">
-                <h1 className="font-heading text-2xl font-bold text-foreground">{student.name}</h1>
-                <p className="text-muted-foreground">{student.email}</p>
-                <p className="text-xs text-muted-foreground mt-1">Joined {student.joinDate}</p>
+
+              <div className="text-center sm:text-left flex-1">
+                <h1 className="font-heading text-2xl font-bold text-foreground">{user?.name}</h1>
+                <p className="text-muted-foreground">{user?.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="capitalize bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-medium">
+                    {user?.role}
+                  </span>
+                  <span className="ml-2">· Joined {user?.joinDate}</span>
+                </p>
               </div>
-              <div className="sm:ml-auto grid grid-cols-3 gap-6 text-center">
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-6 text-center">
                 <div>
                   <AnimatedCounter target={student.enrolledCourses.length} className="text-2xl font-bold text-primary" />
                   <p className="text-xs text-muted-foreground">Courses</p>
@@ -42,6 +75,24 @@ export default function Profile() {
                   </div>
                   <p className="text-xs text-muted-foreground">Streak</p>
                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 sm:ml-4">
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground hover:bg-secondary/80 hover:border-primary/30 transition-all"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive hover:bg-destructive/20 transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Log Out
+                </button>
               </div>
             </div>
           </GlowCard>
@@ -72,7 +123,7 @@ export default function Profile() {
                       <p className="text-sm font-medium text-foreground">{course?.title || courseId}</p>
                       <p className="text-xs text-muted-foreground">{progress.completed}/{progress.total} lessons · Score: {progress.score}%</p>
                       <div className="h-1.5 bg-secondary rounded-full mt-1">
-                        <div className="h-1.5 bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="h-1.5 bg-primary rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   </div>
@@ -82,7 +133,7 @@ export default function Profile() {
           </GlowCard>
         </ScrollReveal>
 
-        {/* Certificates placeholder */}
+        {/* Certificates */}
         <ScrollReveal>
           <GlowCard glowColor="amber">
             <h3 className="font-heading font-semibold text-foreground mb-4">🎓 Certificates</h3>
@@ -93,6 +144,9 @@ export default function Profile() {
           </GlowCard>
         </ScrollReveal>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </DashboardLayout>
   );
 }
