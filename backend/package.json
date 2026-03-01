@@ -1,0 +1,15 @@
+{
+  "name": "edunest-backend",
+  "version": "1.0.0",
+  "description": "EduNest Learning Hub - Backend API",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "seed": "node src/db/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
