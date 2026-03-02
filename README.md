@@ -239,7 +239,7 @@ npm run dev
 | Role | Email | Password |
 |---|---|---|
 | 👨‍🎓 Student | `aryan@example.com` | `password123` |
-| 🛠️ Admin | `admin@edunest.com` | `admin123` |
+| 🛠️ Admin | `admin@edunest.com` | `password123` |
 
 ---
 
